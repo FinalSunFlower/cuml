@@ -546,10 +546,12 @@ dependencies:
           - numpydoc
           - pip:
               - nvidia-sphinx-theme
+              - sphinx-llm>=1.1.0
       - output_types: requirements
         packages:
           - matplotlib
           - nvidia-sphinx-theme
+          - sphinx-llm>=1.1.0
   py_version:
     specific:
       - output_types: conda
