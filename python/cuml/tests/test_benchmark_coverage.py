@@ -64,7 +64,7 @@ def _registry_estimators() -> dict[str, set[str]]:
 
 def _manifest_algorithms() -> set[str]:
     """Read algorithm names from the canonical single-GPU benchmark manifest."""
-    from cuml.benchmark.config import load_config_file
+    from cuml.benchmark.config import load_and_resolve_config
 
     configs_dir = (
         Path(__file__).resolve().parents[1] / "cuml" / "benchmark" / "configs"
@@ -75,10 +75,10 @@ def _manifest_algorithms() -> set[str]:
     )
 
     names = set()
-    raw_config = load_config_file(str(manifest))
+    resolved_config = load_and_resolve_config(str(manifest))
     names.update(
         entry["algorithm"]
-        for entry in raw_config["benchmarks"]
+        for entry in resolved_config["benchmarks"]
         if entry.get("algorithm")
     )
     return names
@@ -89,11 +89,11 @@ def test_manifest_algorithms_uses_single_gpu_manifest(monkeypatch):
     loaded_paths = []
     config_module = ModuleType("cuml.benchmark.config")
 
-    def load_config_file(path):
+    def load_and_resolve_config(path):
         loaded_paths.append(path)
         return {"benchmarks": [{"algorithm": "CanonicalAlgorithm"}]}
 
-    config_module.load_config_file = load_config_file
+    config_module.load_and_resolve_config = load_and_resolve_config
     monkeypatch.setitem(sys.modules, "cuml", ModuleType("cuml"))
     monkeypatch.setitem(
         sys.modules, "cuml.benchmark", ModuleType("cuml.benchmark")
@@ -109,6 +109,30 @@ def test_manifest_algorithms_uses_single_gpu_manifest(monkeypatch):
             / "configs"
             / "single_gpu.yaml"
         )
+    ]
+
+
+def test_manifest_algorithms_excludes_disabled_entries(monkeypatch):
+    """Exclude disabled benchmark entries from effective manifest coverage."""
+    config_module = ModuleType("cuml.benchmark.config")
+    config_module.load_and_resolve_config = lambda path: {
+        "benchmarks": [{"algorithm": "EnabledAlgorithm"}]
+    }
+    monkeypatch.setitem(sys.modules, "cuml", ModuleType("cuml"))
+    monkeypatch.setitem(
+        sys.modules, "cuml.benchmark", ModuleType("cuml.benchmark")
+    )
+    monkeypatch.setitem(sys.modules, "cuml.benchmark.config", config_module)
+
+    assert _manifest_algorithms() == {"EnabledAlgorithm"}
+    assert _coverage_errors(
+        {"DisabledEstimator": object},
+        {"DisabledEstimator": {"DisabledAlgorithm"}},
+        _manifest_algorithms(),
+        {},
+    ) == [
+        "DisabledEstimator: registry entries [DisabledAlgorithm] are absent "
+        "from manifests"
     ]
 
 
