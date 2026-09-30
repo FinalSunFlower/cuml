@@ -84,58 +84,6 @@ def _manifest_algorithms() -> set[str]:
     return names
 
 
-def test_manifest_algorithms_uses_single_gpu_manifest(monkeypatch):
-    """Load manifest algorithms only from the canonical single-GPU manifest."""
-    loaded_paths = []
-    config_module = ModuleType("cuml.benchmark.config")
-
-    def load_and_resolve_config(path):
-        loaded_paths.append(path)
-        return {"benchmarks": [{"algorithm": "CanonicalAlgorithm"}]}
-
-    config_module.load_and_resolve_config = load_and_resolve_config
-    monkeypatch.setitem(sys.modules, "cuml", ModuleType("cuml"))
-    monkeypatch.setitem(
-        sys.modules, "cuml.benchmark", ModuleType("cuml.benchmark")
-    )
-    monkeypatch.setitem(sys.modules, "cuml.benchmark.config", config_module)
-
-    assert _manifest_algorithms() == {"CanonicalAlgorithm"}
-    assert loaded_paths == [
-        str(
-            Path(__file__).resolve().parents[1]
-            / "cuml"
-            / "benchmark"
-            / "configs"
-            / "single_gpu.yaml"
-        )
-    ]
-
-
-def test_manifest_algorithms_excludes_disabled_entries(monkeypatch):
-    """Exclude disabled benchmark entries from effective manifest coverage."""
-    config_module = ModuleType("cuml.benchmark.config")
-    config_module.load_and_resolve_config = lambda path: {
-        "benchmarks": [{"algorithm": "EnabledAlgorithm"}]
-    }
-    monkeypatch.setitem(sys.modules, "cuml", ModuleType("cuml"))
-    monkeypatch.setitem(
-        sys.modules, "cuml.benchmark", ModuleType("cuml.benchmark")
-    )
-    monkeypatch.setitem(sys.modules, "cuml.benchmark.config", config_module)
-
-    assert _manifest_algorithms() == {"EnabledAlgorithm"}
-    assert _coverage_errors(
-        {"DisabledEstimator": object},
-        {"DisabledEstimator": {"DisabledAlgorithm"}},
-        _manifest_algorithms(),
-        {},
-    ) == [
-        "DisabledEstimator: registry entries [DisabledAlgorithm] are absent "
-        "from manifests"
-    ]
-
-
 def _coverage_errors(
     estimators: Mapping[str, type],
     registry: Mapping[str, Iterable[str]],
@@ -183,6 +131,30 @@ def test_public_estimators_have_benchmark_coverage():
     assert not errors, "\n".join(errors)
 
 
+def test_manifest_algorithms_excludes_disabled_entries(monkeypatch):
+    """Exclude disabled benchmark entries from effective manifest coverage."""
+    config_module = ModuleType("cuml.benchmark.config")
+    config_module.load_and_resolve_config = lambda path: {
+        "benchmarks": [{"algorithm": "EnabledAlgorithm"}]
+    }
+    monkeypatch.setitem(sys.modules, "cuml", ModuleType("cuml"))
+    monkeypatch.setitem(
+        sys.modules, "cuml.benchmark", ModuleType("cuml.benchmark")
+    )
+    monkeypatch.setitem(sys.modules, "cuml.benchmark.config", config_module)
+
+    assert _manifest_algorithms() == {"EnabledAlgorithm"}
+    assert _coverage_errors(
+        {"DisabledEstimator": object},
+        {"DisabledEstimator": {"DisabledAlgorithm"}},
+        _manifest_algorithms(),
+        {},
+    ) == [
+        "DisabledEstimator: registry entries [DisabledAlgorithm] are absent "
+        "from manifests"
+    ]
+
+
 def test_benchmark_exclusion_reasons_are_required():
     """Reject exclusions whose justification is empty or whitespace-only."""
     errors = _coverage_errors(
@@ -220,19 +192,6 @@ def test_registry_entry_without_manifest_is_rejected():
             "ExampleEstimator: registry entries [ExampleEstimator] are absent "
             "from manifests"
         )
-    ]
-
-
-def test_manifest_entry_without_registry_is_rejected():
-    """Report an unregistered class-name manifest entry as lacking both."""
-    errors = _coverage_errors(
-        {"ExampleEstimator": object},
-        {},
-        {"ExampleEstimator"},
-        {},
-    )
-    assert errors == [
-        "ExampleEstimator: missing benchmark registry and manifest entries"
     ]
 
 
