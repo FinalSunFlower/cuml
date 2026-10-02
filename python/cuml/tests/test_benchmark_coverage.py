@@ -19,10 +19,7 @@ from types import ModuleType
 # Every entry must remain tied to a currently discoverable estimator; otherwise
 # the stale-exclusion check below fails and the map can be pruned.
 BENCHMARK_EXCLUSIONS = {
-    "ARIMA": "Time-series API has no canonical benchmark manifest.",
-    "AutoARIMA": "Time-series API has no canonical benchmark manifest.",
     "CD": "Low-level solver API is outside the estimator benchmark suite.",
-    "ExponentialSmoothing": "Time-series API has no canonical benchmark manifest.",
     "HDBSCAN": "Optional dependency has no canonical benchmark manifest.",
     "IsolationForest": "No benchmark registry pair is defined yet.",
     "Lars": "No benchmark registry pair is defined yet.",
